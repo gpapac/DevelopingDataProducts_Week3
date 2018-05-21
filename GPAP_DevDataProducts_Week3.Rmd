@@ -1,0 +1,103 @@
+---
+title: "Developing Data Products Week 3 Assignment"
+author: "Papachrysanthou George"
+date: "May 20, 2018"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(plotly)
+```
+
+## Countries power production capacity
+
+Power production capacity per country vs population and GDP per capita. Radius ~ power production capacity, Color ~ power production capacity / population
+
+```{r echo = FALSE, warning=FALSE}
+
+global_power_plants = read.csv("E:/GPAPAC_Files/Study/Coursera/09.DevelopingDataProducts/Week3Assignment/globalpowerplantdatabasev100/global_power_plant_database.csv", dec=".", na.strings = "NA",stringsAsFactors=FALSE)
+
+countries_population<-read.csv("E:/GPAPAC_Files/Study/Coursera/09.DevelopingDataProducts/Week3Assignment/globalpowerplantdatabasev100/API_SP.POP.TOTL_DS2_en_csv_v2_9908626.csv",stringsAsFactors=FALSE, skip = 4, header = T, dec=".")
+
+countries_percapitaGDP<-read.csv("E:/GPAPAC_Files/Study/Coursera/09.DevelopingDataProducts/Week3Assignment/globalpowerplantdatabasev100/API_NY.GDP.PCAP.CD_DS2_en_csv_v2_9908784.csv",stringsAsFactors=FALSE, skip = 4, header = T, dec=".")
+
+
+countries_population2015 <- countries_population[,c("Country.Code", "Country.Name", "X2015")]
+
+names(countries_population2015)[3] <- "Population"
+
+countries_percapitaGDP2015 <- countries_percapitaGDP[,c("Country.Code", "X2015")]
+
+names(countries_percapitaGDP2015)[2] <- "PerCapitaGDP"
+
+
+countries_data <- merge(countries_population2015, countries_percapitaGDP2015, by.x=c("Country.Code"), by.y=c("Country.Code"))
+
+# str(countries_data)
+# str(global_power_plants)
+# str(countries_population2015)
+
+mw_by_country_and_fuel1 <- aggregate(capacity_mw ~ country + fuel1, data=global_power_plants, FUN=sum)
+
+mw_by_country <- aggregate(capacity_mw ~ country, data=global_power_plants, FUN=sum)
+
+mw_by_country$capacity_gw <- mw_by_country$capacity_mw/1000 
+
+mw_by_country_new <- merge(mw_by_country, countries_data, by.x=c("country"), by.y=c("Country.Code"))
+
+mw_by_country_new$capacity_kw_per_capita <- 1000*mw_by_country_new$capacity_mw / mw_by_country_new$Population
+
+# str(mw_by_country_new)
+
+# power_plants_lat_long <- data.frame(lat=global_power_plants$latitude, lng=global_power_plants$longitude )
+
+# power_plants_popup<-global_power_plants$name
+
+# my_map<-power_plants_lat_long %>% leaflet() %>% addTiles() %>% addCircleMarkers(popup=power_plants_popup, weight=1, radius=3, color="green")
+# my_map
+
+
+# plot_ly(mw_by_country_new, x=~Population, y=~PerCapitaGDP, z=~capacity_mw, type="scatter3d", mode="markers")
+
+plot_ly(mw_by_country_new, x=~Population, y=~PerCapitaGDP, type = 'scatter', mode="markers", color=~capacity_kw_per_capita, colors=c("blue","red"), size=~capacity_mw
+,hoverinfo = 'text',
+text = ~paste('Country:', country, ' (', Country.Name, ')', '<br>Capacity MW:', capacity_mw, '<br>Population:', Population, '<br>Per Capita GDP:', PerCapitaGDP, '<br>Per Capita KW:', capacity_kw_per_capita)        
+)
+
+```
+
+## And a plotly choropleth map
+Power production capacity per country
+
+```{r echo = FALSE, warning=FALSE}
+
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = TRUE,
+  projection = list(type = 'Mercator')
+)
+
+# mw_by_country <- mw_by_country[which(mw_by_country$country=="GRC"),]
+# Warning!!! Choropleth maps do not appear in RStudio viewer
+# You have to open it it a browser
+plot_ly(mw_by_country, z = ~capacity_gw, locations = ~country, type = 'choropleth',
+        color = ~capacity_gw, colors=c("blue","red"), marker = list(line = l),
+        colorbar = list(tickprefix = '', title = 'Power Plants GWs')) %>%
+  layout(title = 'Countries power capacity<br>Source:<a href="http://datasets.wri.org/dataset/globalpowerplantdatabase">Global Power Plant Database</a>',
+         geo = g)
+
+```
+
+## Thank you
+
+For this presentation, the following data sources were used:
+
+* Global Power Plant Database <http://datasets.wri.org/dataset/globalpowerplantdatabase>
+* Population, total from world bank <https://data.worldbank.org/indicator/SP.POP.TOTL>
+* GDP per capita (current US$) from world bank <https://data.worldbank.org/indicator/NY.GDP.PCAP.CD>
+
